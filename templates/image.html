@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Animal Detection</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<script>
+			// Load DaisyUI (extends TailwindCSS)
+			tailwind.config = {
+				plugins: [require('daisyui')],
+				daisyui: {
+					themes: ['emerald'], // Choose a theme
+				},
+			}
+		</script>
+	</head>
+
+	<body class="bg-gray-200 text-gray-800">
+		<nav class="bg-gray-100 shadow-sm px-5">
+			<div
+				class="container mx-auto py-5 flex items-center justify-between md:justify-center space-x-0 md:space-x-32"
+			>
+				<a
+					href="/"
+					class="btn btn-sm btn-primary border border-gray-300 py-2 px-3 rounded-lg"
+					>Overview</a
+				>
+				<a href="/" class="">
+					<img src="/static/logo.png" width="48px" alt="Animal Detector" />
+				</a>
+				<a
+					href="/image"
+					class="btn btn-sm btn-primary border border-gray-300 py-2 px-5 rounded-lg"
+					>Model</a
+				>
+			</div>
+		</nav>
+
+		<div class="container mx-auto py-10">
+			<h1 class="text-3xl font-bold text-center">Animal Detection</h1>
+			<div
+				class="relative max-w-2xl w-11/12 md:w-full p-5 my-5 mx-auto artboard artboard-horizontal bg-white shadow-lg rounded-lg phone-1"
+			>
+				<div
+					id="processing"
+					class="hidden absolute flex items-center justify-center top-0 left-0 w-full h-full bg-white/70 animate-pulse"
+				>
+					Processing...
+				</div>
+				<div
+					class="w-32 h-10 p-0.5 flex items-center justify-evenly mx-auto border border-gray-300 rounded-lg font-semibold text-sm"
+				>
+					<div
+						class="w-full h-full bg-green-500 rounded-lg flex items-center justify-center text-white"
+					>
+						Image
+					</div>
+					<a
+						href="/video"
+						class="w-full h-full flex items-center justify-center"
+					>
+						Video
+					</a>
+				</div>
+
+				<div class="mt-5 space-y-2">
+					<form id="captureForm" enctype="multipart/form-data">
+						<label
+							for="captureInput"
+							class="h-24 flex justify-center items-center bg-gray-200 border-2 border-dashed border-gray-400 rounded-lg text-gray-400 font-semibold cursor-pointer"
+						>
+							Tap to capture photo
+						</label>
+						<input
+							type="file"
+							id="captureInput"
+							name="image"
+							accept="image/*"
+							capture="environment"
+							class="hidden"
+						/>
+					</form>
+					<form id="uploadForm" enctype="multipart/form-data">
+						<label
+							for="uploadInput"
+							class="h-24 flex justify-center items-center bg-gray-200 border-2 border-dashed border-gray-400 rounded-lg text-gray-400 font-semibold cursor-pointer"
+						>
+							Click to upload the image
+						</label>
+						<input
+							type="file"
+							id="uploadInput"
+							name="image"
+							accept="image/*"
+							class="hidden"
+						/>
+					</form>
+				</div>
+			</div>
+
+			<div
+				id="output"
+				class="hidden md:hidden md:flex items-center justify-between max-w-5xl w-11/12 md:w-full p-5 my-5 mx-auto bg-white shadow-lg rounded-lg"
+			>
+				<div class="w-full p-3 space-y-3">
+					<p class="font-bold text-xl text-center">Input</p>
+					<img
+						id="inputImage"
+						src=""
+						alt="Placeholder"
+						class="w-full rounded-lg"
+					/>
+				</div>
+				<div class="w-full p-3 space-y-3">
+					<p class="font-bold text-xl text-center">Output</p>
+					<img
+						id="outputImage"
+						src=""
+						alt="Placeholder"
+						class="w-full rounded-lg"
+					/>
+				</div>
+			</div>
+		</div>
+
+		<script>
+			const captureForm = document.getElementById('captureForm')
+			const uploadForm = document.getElementById('uploadForm')
+
+			const captureInput = document.getElementById('captureInput')
+			const uploadInput = document.getElementById('uploadInput')
+
+			const inputImage = document.getElementById('inputImage')
+			const outputImage = document.getElementById('outputImage')
+
+			const process = async (type) => {
+				// show processing
+				setLoading(true)
+
+				// clear outputs
+				setOutput(false)
+
+				// submit the form
+				const formData = new FormData(
+					type === 'capture' ? captureForm : uploadForm
+				)
+				try {
+					const res = await submitImg(formData)
+					if (res.error) {
+						alert(res.error)
+						setLoading(false)
+						return
+					}
+
+					// hide processing
+					setLoading(false)
+
+					// show output
+					inputImage.src = URL.createObjectURL(
+						type === 'capture' ? captureInput.files[0] : uploadInput.files[0]
+					)
+					outputImage.src = res.result_image
+
+					setOutput(true)
+				} catch (err) {
+					setLoading(false)
+					alert(err)
+				}
+			}
+
+			captureInput.addEventListener('change', async () => process('capture'))
+			uploadInput.addEventListener('change', async () => process('upload'))
+
+			const submitImg = async (formData) =>
+				await fetch('/process', {
+					method: 'POST',
+					body: formData,
+				})
+					.then((res) => res.json())
+					.then((data) => data)
+
+			const setLoading = (bool) =>
+				bool
+					? document.getElementById('processing').classList.remove('hidden')
+					: document.getElementById('processing').classList.add('hidden')
+
+			const setOutput = (bool) => {
+				if (bool) {
+					document.getElementById('output').classList.remove('hidden')
+					document.getElementById('output').classList.remove('md:hidden')
+				} else {
+					document.getElementById('output').classList.add('hidden')
+					document.getElementById('output').classList.add('md:hidden')
+				}
+			}
+		</script>
+	</body>
+</html>

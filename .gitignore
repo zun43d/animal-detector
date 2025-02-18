@@ -106,4 +106,3 @@ venv.bak/
 # Project specific
 Media/*
 uploads/*
-static

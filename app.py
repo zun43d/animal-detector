@@ -13,11 +13,20 @@ UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Load YOLO model with custom weights
-model = YOLO("Weights/best (3).pt")  # Update the path to your custom weights
+model = YOLO("Weights/best-100.pt")  # Update the path to your custom weights
 classNames = ['Bear', 'Cheetah', 'Crocodile', 'Elephant', 'Fox', 'Giraffe', 'Hedgehog', 'Human', 'Leopard', 'Lion', 'Lynx', 'Ostrich', 'Rhinoceros', 'Tiger', 'Zebra'] 
+
 @app.route('/')
 def home():
     return render_template('index.html')
+
+@app.route('/image')
+def image():
+    return render_template('image.html')
+
+@app.route('/video')
+def video():
+    return render_template('video.html')
 
 @app.route('/process', methods=['POST'])
 def process_image():
