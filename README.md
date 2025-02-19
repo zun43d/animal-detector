@@ -1,5 +1,5 @@
 ```bash
-apt-get update && apt-get install ffmpeg libsm6 libxext6
+sudo apt-get update && sudo apt-get install ffmpeg libsm6 libxext6
 ```
 
 ```bash
