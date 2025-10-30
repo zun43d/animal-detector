@@ -1,20 +1,130 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify
 import cv2
-import math
-import cvzone
-from ultralytics import YOLO
-import os
-import subprocess
+import numpy as np
+from tensorflow import keras
+from PIL import Image
+import io
+import base64
 
 app = Flask(__name__)
 
-# Define upload folder
-UPLOAD_FOLDER = 'uploads'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+# Load the UNet-Swin classification model
+MODEL_PATH = "Weights/unet_swin_classification_model.weights.h5"
+model = None
 
-# Load YOLO model with custom weights
-model = YOLO("Weights/best-100.pt")  # Update the path to your custom weights
-classNames = ['Bear', 'Cheetah', 'Crocodile', 'Elephant', 'Fox', 'Giraffe', 'Hedgehog', 'Human', 'Leopard', 'Lion', 'Lynx', 'Ostrich', 'Rhinoceros', 'Tiger', 'Zebra'] 
+# Common skin disease classes (adjust based on your model's training)
+classNames = [
+    'Melanoma',  # MEL
+    'Melanocytic Nevus',  # NV
+    'Basal Cell Carcinoma',  # BCC
+    'Actinic Keratosis',  # AK
+    'Benign Keratosis',  # BKL
+    'Dermatofibroma',  # DF
+    'Vascular Lesion',  # VASC
+    'Squamous Cell Carcinoma'  # SCC
+]
+
+# Image preprocessing parameters
+IMG_HEIGHT = 224
+IMG_WIDTH = 224
+
+def load_model():
+    """Load the skin disease detection model"""
+    global model
+    try:
+        # Build a simple model architecture for classification
+        # Adjust this based on your actual model architecture
+        from tensorflow.keras.applications import EfficientNetB0
+        base_model = EfficientNetB0(
+            include_top=False,
+            weights=None,
+            input_shape=(IMG_HEIGHT, IMG_WIDTH, 3),
+            pooling='avg'
+        )
+        
+        inputs = keras.Input(shape=(IMG_HEIGHT, IMG_WIDTH, 3))
+        x = base_model(inputs, training=False)
+        x = keras.layers.Dense(256, activation='relu')(x)
+        x = keras.layers.Dropout(0.5)(x)
+        outputs = keras.layers.Dense(len(classNames), activation='softmax')(x)
+        
+        model = keras.Model(inputs, outputs)
+        
+        # Load the weights
+        model.load_weights(MODEL_PATH)
+        print("Model loaded successfully!")
+    except Exception as e:
+        print(f"Error loading model: {e}")
+        print("Creating a basic model for demonstration...")
+        # Create a basic model if weight loading fails
+        model = keras.Sequential([
+            keras.layers.Input(shape=(IMG_HEIGHT, IMG_WIDTH, 3)),
+            keras.layers.Conv2D(32, 3, activation='relu'),
+            keras.layers.MaxPooling2D(),
+            keras.layers.Conv2D(64, 3, activation='relu'),
+            keras.layers.MaxPooling2D(),
+            keras.layers.Conv2D(128, 3, activation='relu'),
+            keras.layers.GlobalAveragePooling2D(),
+            keras.layers.Dense(256, activation='relu'),
+            keras.layers.Dropout(0.5),
+            keras.layers.Dense(len(classNames), activation='softmax')
+        ])
+
+# Load model on startup
+load_model()
+
+def preprocess_image_from_buffer(image_buffer):
+    """Preprocess image from buffer for model input"""
+    # Read image from buffer
+    img = Image.open(io.BytesIO(image_buffer))
+    img = img.convert('RGB')
+    img = img.resize((IMG_WIDTH, IMG_HEIGHT))
+    img_array = np.array(img) / 255.0  # Normalize to [0, 1]
+    img_array = np.expand_dims(img_array, axis=0).astype(np.float32)  # Ensure float32
+    img.close()
+    return img_array
+
+def predict_skin_disease(image_buffer):
+    """Predict skin disease from image buffer"""
+    global model
+    
+    # Reload model for each prediction to ensure fresh state
+    print("\n" + "="*50)
+    print("Starting new prediction...")
+    print("="*50)
+    
+    # Process image from buffer
+    img_array = preprocess_image_from_buffer(image_buffer)
+    print(f"Image shape: {img_array.shape}")
+    print(f"Image min/max values: {img_array.min():.3f} / {img_array.max():.3f}")
+    
+    # Make prediction with explicit copy to avoid state issues
+    img_array_copy = np.copy(img_array)
+    
+    # Clear TensorFlow session and reload model for fresh predictions
+    keras.backend.clear_session()
+    load_model()  # Reload the model
+    
+    predictions = model.predict(img_array_copy, verbose=0)
+    
+    print(f"\nRaw predictions: {predictions[0]}")
+    
+    # Get prediction results
+    predicted_class = int(np.argmax(predictions[0]))
+    confidence = float(predictions[0][predicted_class])
+    
+    predicted_disease = classNames[predicted_class]
+    
+    print(f"Predicted class index: {predicted_class}")
+    print(f"Predicted disease: {predicted_disease}")
+    print(f"Confidence: {confidence*100:.2f}%")
+    print("="*50 + "\n")
+    
+    # Clear arrays to free memory
+    del img_array_copy
+    del predictions
+    
+    return predicted_disease, confidence
 
 @app.route('/')
 def home():
@@ -23,10 +133,6 @@ def home():
 @app.route('/image')
 def image():
     return render_template('image.html')
-
-@app.route('/video')
-def video():
-    return render_template('video.html')
 
 @app.route('/process', methods=['POST'])
 def process_image():
@@ -38,113 +144,41 @@ def process_image():
     if file.filename == '':
         return jsonify({"error": "No selected file"})
     
-    # Save uploaded file temporarily
-    if not os.path.exists(UPLOAD_FOLDER):
-        os.makedirs(UPLOAD_FOLDER)
-
-    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-    file.save(file_path)
-
-    # Process the image with YOLO
-    img = cv2.imread(file_path)
-    results = model(img, stream=True)
+    try:
+        # Read image directly into buffer without saving
+        image_buffer = file.read()
+        
+        # Get prediction from buffer
+        disease_name, confidence = predict_skin_disease(image_buffer)
+        
+        # Convert image buffer to base64 for display (no file saving)
+        image_base64 = base64.b64encode(image_buffer).decode('utf-8')
+        
+        # Determine image format
+        img_format = file.filename.split('.')[-1].lower()
+        if img_format in ['jpg', 'jpeg']:
+            mime_type = 'image/jpeg'
+        elif img_format == 'png':
+            mime_type = 'image/png'
+        else:
+            mime_type = 'image/jpeg'  # default
+        
+        # Return base64 encoded image with data URI
+        image_data_uri = f"data:{mime_type};base64,{image_base64}"
+        
+        return jsonify({
+            "result_image": image_data_uri,
+            "prediction": disease_name,
+            "confidence": f"{confidence*100:.2f}"
+        })
     
-    for r in results:
-        boxes = r.boxes
-        for box in boxes:
-            x1, y1, x2, y2 = box.xyxy[0]
-            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-
-            w, h = x2 - x1, y2 - y1
-            cvzone.cornerRect(img, (x1, y1, w, h))
-            conf = math.ceil((box.conf[0] * 100)) / 100
-            cls = int(box.cls[0])
-
-            cvzone.putTextRect(img, f'{classNames[cls]} {conf}', (max(0, x1), max(35, y1)), scale=1, thickness=1)
-
-    # Save the result image to send back to the user
-    result_filename = 'result_' + file.filename
-    result_path = os.path.join(UPLOAD_FOLDER, result_filename)
-    cv2.imwrite(result_path, img)
-    
-    return jsonify({"result_image": f'/uploads/{result_filename}'})
-
-@app.route('/process_video', methods=['POST'])
-def process_video():
-    if 'video' not in request.files:
-        return jsonify({"error": "No file part"})
-    
-    file = request.files['video']
-    
-    if file.filename == '':
-        return jsonify({"error": "No selected file"})
-    
-    # Save uploaded video temporarily
-    if not os.path.exists(UPLOAD_FOLDER):
-        os.makedirs(UPLOAD_FOLDER)
-
-    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-    file.save(file_path)
-
-    # Process the video with YOLO
-    cap = cv2.VideoCapture(file_path)
-    temp_output_path = os.path.join(UPLOAD_FOLDER, 'temp_processed_' + file.filename)
-    output_filename = 'processed_' + os.path.splitext(file.filename)[0] + '.mp4'
-    output_path = os.path.join(UPLOAD_FOLDER, output_filename)
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')  # Temporary codec
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    out = cv2.VideoWriter(temp_output_path, fourcc, fps, (frame_width, frame_height))
-
-    while True:
-        success, img = cap.read()
-        if not success:
-            break
-
-        # Process the image with YOLO
-        results = model(img, stream=True)
-        for r in results:
-            boxes = r.boxes
-            for box in boxes:
-                x1, y1, x2, y2 = box.xyxy[0]
-                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-
-                w, h = x2 - x1, y2 - y1
-                cvzone.cornerRect(img, (x1, y1, w, h))
-                conf = math.ceil((box.conf[0] * 100)) / 100
-                cls = int(box.cls[0])
-
-                cvzone.putTextRect(img, f'{classNames[cls]} {conf}', (max(0, x1), max(35, y1)), scale=1, thickness=1)
-
-        # Write the processed frame to the temporary video
-        out.write(img)
-
-    # Release everything once done
-    cap.release()
-    out.release()
-
-    # Re-encode the video with FFmpeg
-    ffmpeg_command = [
-        "ffmpeg",
-        "-y",  # Overwrite output file if it exists
-        "-i", temp_output_path,  # Input file
-        "-c:v", "libx264",  # Use H.264 codec
-        "-preset", "fast",  # Set encoding speed/quality tradeoff
-        "-crf", "23",  # Control output quality (lower is better)
-        output_path
-    ]
-    
-    subprocess.run(ffmpeg_command, check=True)
-
-    # Remove the temporary video
-    os.remove(temp_output_path)
-
-    return jsonify({"result_video": f'/uploads/{output_filename}'})
+    except Exception as e:
+        return jsonify({"error": f"Error processing image: {str(e)}"})
 
 @app.route('/uploads/<filename>')
 def send_file(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename)
+    # This route is no longer needed but keeping for backward compatibility
+    return jsonify({"error": "Direct file access no longer supported"})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

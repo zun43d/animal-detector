@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Animal Detection</title>
+		<title>Skin Disease Detection</title>
 		<script src="https://cdn.tailwindcss.com"></script>
 		<script>
 			// Load DaisyUI (extends TailwindCSS)
@@ -27,7 +27,11 @@
 					>Overview</a
 				>
 				<a href="/" class="">
-					<img src="/static/logo.png" width="48px" alt="Animal Detector" />
+					<img
+						src="/static/logo.png"
+						width="48px"
+						alt="Skin Disease Detector"
+					/>
 				</a>
 				<a
 					href="/image"
@@ -38,7 +42,10 @@
 		</nav>
 
 		<div class="container mx-auto py-10">
-			<h1 class="text-3xl font-bold text-center">Animal Detection</h1>
+			<h1 class="text-3xl font-bold text-center">Skin Disease Detection</h1>
+			<p class="text-center text-sm text-gray-600 mt-2">
+				Upload a clear image of the skin lesion for analysis
+			</p>
 			<div
 				class="relative max-w-2xl w-11/12 md:w-full p-5 my-5 mx-auto artboard artboard-horizontal bg-white shadow-lg rounded-lg phone-1"
 			>
@@ -48,29 +55,14 @@
 				>
 					Processing...
 				</div>
-				<div
-					class="w-32 h-10 p-0.5 flex items-center justify-evenly mx-auto border border-gray-300 rounded-lg font-semibold text-sm"
-				>
-					<div
-						class="w-full h-full bg-green-500 rounded-lg flex items-center justify-center text-white"
-					>
-						Image
-					</div>
-					<a
-						href="/video"
-						class="w-full h-full flex items-center justify-center"
-					>
-						Video
-					</a>
-				</div>
 
 				<div class="mt-5 space-y-2">
 					<form id="captureForm" enctype="multipart/form-data">
 						<label
 							for="captureInput"
-							class="h-24 flex justify-center items-center bg-gray-200 border-2 border-dashed border-gray-400 rounded-lg text-gray-400 font-semibold cursor-pointer"
+							class="h-24 flex justify-center items-center bg-gray-200 border-2 border-dashed border-gray-400 rounded-lg text-gray-400 font-semibold cursor-pointer hover:bg-gray-300 transition"
 						>
-							Tap to capture photo
+							📸 Tap to capture photo
 						</label>
 						<input
 							type="file"
@@ -84,9 +76,9 @@
 					<form id="uploadForm" enctype="multipart/form-data">
 						<label
 							for="uploadInput"
-							class="h-24 flex justify-center items-center bg-gray-200 border-2 border-dashed border-gray-400 rounded-lg text-gray-400 font-semibold cursor-pointer"
+							class="h-24 flex justify-center items-center bg-gray-200 border-2 border-dashed border-gray-400 rounded-lg text-gray-400 font-semibold cursor-pointer hover:bg-gray-300 transition"
 						>
-							Click to upload the image
+							📁 Click to upload the image
 						</label>
 						<input
 							type="file"
@@ -97,29 +89,95 @@
 						/>
 					</form>
 				</div>
+
+				<div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+					<p class="text-xs text-yellow-800">
+						<strong>⚠️ Important:</strong> This is a screening tool only. Always
+						consult a dermatologist for proper diagnosis and treatment.
+					</p>
+				</div>
 			</div>
 
 			<div
 				id="output"
-				class="hidden md:hidden md:flex items-center justify-between max-w-5xl w-11/12 md:w-full p-5 my-5 mx-auto bg-white shadow-lg rounded-lg"
+				class="hidden max-w-6xl w-11/12 md:w-full my-5 mx-auto bg-white shadow-lg rounded-lg"
 			>
-				<div class="w-full p-3 space-y-3">
-					<p class="font-bold text-xl text-center">Input</p>
-					<img
-						id="inputImage"
-						src=""
-						alt="Placeholder"
-						class="w-full rounded-lg"
-					/>
-				</div>
-				<div class="w-full p-3 space-y-3">
-					<p class="font-bold text-xl text-center">Output</p>
-					<img
-						id="outputImage"
-						src=""
-						alt="Placeholder"
-						class="w-full rounded-lg"
-					/>
+				<div class="md:flex items-stretch p-5 gap-5">
+					<!-- Left Side - Input Image -->
+					<div class="w-full md:w-1/2 space-y-3">
+						<p class="font-bold text-xl text-center text-gray-800">
+							Uploaded Image
+						</p>
+						<img
+							id="inputImage"
+							src=""
+							alt="Input"
+							class="w-full rounded-lg border-2 border-gray-300 shadow-md"
+						/>
+					</div>
+
+					<!-- Right Side - Diagnosis Results -->
+					<div class="w-full md:w-1/2 space-y-3 mt-5 md:mt-0">
+						<p class="font-bold text-xl text-center text-gray-800">
+							Analysis Results
+						</p>
+						<div
+							class="bg-gradient-to-br from-green-50 to-blue-50 border-2 border-green-200 rounded-lg p-5 shadow-md"
+						>
+							<h3
+								class="text-2xl font-bold text-gray-800 mb-4 flex items-center justify-center"
+							>
+								<svg
+									class="w-8 h-8 mr-2 text-green-600"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+									></path>
+								</svg>
+								Diagnosis
+							</h3>
+							<div class="space-y-4">
+								<div class="bg-white rounded-lg p-5 shadow-sm">
+									<p class="text-sm text-gray-600 font-semibold mb-2">
+										Detected Condition:
+									</p>
+									<p
+										id="predictionText"
+										class="text-3xl font-bold text-gray-900"
+									></p>
+								</div>
+								<div class="bg-white rounded-lg p-5 shadow-sm">
+									<p class="text-sm text-gray-600 font-semibold mb-2">
+										Confidence Level:
+									</p>
+									<p
+										id="confidenceText"
+										class="text-3xl font-bold text-blue-600 mb-3"
+									></p>
+									<div class="bg-gray-200 rounded-full h-4 overflow-hidden">
+										<div
+											id="confidenceBar"
+											class="bg-gradient-to-r from-blue-500 to-green-500 h-full transition-all duration-500 flex items-center justify-center text-xs text-white font-bold"
+											style="width: 0%"
+										></div>
+									</div>
+								</div>
+							</div>
+							<div class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+								<p class="text-xs text-red-700">
+									<strong>⚠️ Medical Disclaimer:</strong> This AI analysis is
+									for informational purposes only. Always consult a qualified
+									dermatologist for proper diagnosis and treatment.
+								</p>
+							</div>
+						</div>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -160,7 +218,27 @@
 					inputImage.src = URL.createObjectURL(
 						type === 'capture' ? captureInput.files[0] : uploadInput.files[0]
 					)
-					outputImage.src = res.result_image
+
+					// FORCE update prediction results by clearing first
+					const predictionElement = document.getElementById('predictionText')
+					const confidenceElement = document.getElementById('confidenceText')
+					const confidenceBarElement = document.getElementById('confidenceBar')
+
+					// Clear old values first
+					predictionElement.textContent = ''
+					confidenceElement.textContent = ''
+					confidenceBarElement.style.width = '0%'
+
+					// Force a DOM reflow
+					void predictionElement.offsetWidth
+
+					// Set new values
+					console.log('New prediction:', res.prediction)
+					console.log('New confidence:', res.confidence)
+
+					predictionElement.textContent = res.prediction
+					confidenceElement.textContent = res.confidence + '%'
+					confidenceBarElement.style.width = res.confidence + '%'
 
 					setOutput(true)
 				} catch (err) {
@@ -188,10 +266,8 @@
 			const setOutput = (bool) => {
 				if (bool) {
 					document.getElementById('output').classList.remove('hidden')
-					document.getElementById('output').classList.remove('md:hidden')
 				} else {
 					document.getElementById('output').classList.add('hidden')
-					document.getElementById('output').classList.add('md:hidden')
 				}
 			}
 		</script>
